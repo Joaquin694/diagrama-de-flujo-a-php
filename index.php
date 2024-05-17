@@ -38,6 +38,9 @@
         
         <button type="submit">Enviar</button>
     </form>
+    
+    <br>
+    <br>
 
     <a href="mostrar_datos.php" target="_blank">Mostrar Datos</a>
     
@@ -74,7 +77,7 @@
         <label for="condicion-2">Condicion 2:</label>
         <input type="text" id="condicion-2" name="condicion-2" required><br><br>
         <label for="respuesta">Respuesta:</label>
-        <input type="text" id="respuesta" name="respuesta" required><br><br>
+        <input type="text" id="respuesta" name="respuesta"><br><br>
         
         <label for="funcion-c">Tipo de funcion:</label>
         <select id="funcion-c" name="funcion-c" required>
@@ -101,6 +104,7 @@
                 datoInput.disabled = false;
             }
         });
+        
     </script>
 
     <hr>

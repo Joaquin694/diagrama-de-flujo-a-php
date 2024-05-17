@@ -6,4 +6,6 @@ echo('2');
 
 
 
-if (3 > 4) { echo 4; }
+for ($i = 2 ; $i <= 3; $i++) { echo 2; }
+
+while ($i = 2 > 3) { echo $i++; }

@@ -17,7 +17,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     switch ($funcion) {
 
         case 'if-f':
-            fwrite($archivo_php, "if ($condicion1 > $condicion2) { echo $respuesta; }\n");
+            fwrite($archivo_php, "if (\$i = $condicion1 > $condicion2) { echo $respuesta; }\n");
+            break;
+        case 'for-f':
+            fwrite($archivo_php, "for (\$i = $condicion1 ; \$i <= $condicion2; \$i++) { echo $condicion1; }\n");
+            break;
+        case 'while-f':
+            fwrite($archivo_php, "while (\$i = $condicion1 > $condicion2) { echo \$i++; }\n");
             break;
         default:
             fwrite($archivo_php, "Error: Funciones.php -> switchFunction;\n");

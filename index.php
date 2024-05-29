@@ -42,7 +42,22 @@
     <br>
     <br>
 
-    <a href="mostrar_datos.php" target="_blank">Mostrar Datos</a>
+    <pre>
+<?php
+    // Lee el contenido del archivo codigo.php
+    $codigo = htmlspecialchars(file_get_contents('codigo.php'));
+    echo $codigo;
+?>
+    </pre>
+    
+    <style>
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+        }
+    </style>
     
     <br>
     <br>

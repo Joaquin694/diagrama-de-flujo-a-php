@@ -17,3 +17,7 @@ $soyunavariable = 'veanquesifunciono';
 $soyunarray = array('1', '2', '3', '4', '5', '6', '7', '8', '9', '10');
 echo('Hola Mundo');
 if ($i = 1 > 2) { echo Uno es mayor; }
+
+$3 = false;
+
+$sa = '1';

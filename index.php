@@ -11,84 +11,308 @@
             height: 600px;
             border: 1px solid black;
         }
+        .context-menu {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 5px;
+            z-index: 1000;
+            display: none;
+        }
+        .context-menu ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .context-menu ul li {
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+        .sub-menu {
+            display: none;
+            margin-left: 10px;
+            padding-left: 10px;
+            border-left: 1px solid #ccc;
+        }
+        .sub-menu li {
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="diagramDiv"></div>
 
-    <!-- Formulario para variables -->
-    <form id="dataForm">
-        <label for="nombre">Nombre de la variable:</label>
-        <input type="text" id="nombre" name="nombre" required><br><br>
-        
-        <label for="tipo">Tipo de dato:</label>
-        <select id="tipo" name="tipo" required>
-            <option value="texto">Texto</option>
-            <option value="numero">Número</option>
-            <option value="booleano">Booleano</option>
-            <option value="constante">Constante</option>
-            <option value="array">Array</option>
-            <option value="suma">Suma de variables</option>
-        </select><br><br>
-        
-        <label for="dato">Ingrese el valor:</label>
-        <input type="text" id="dato" name="dato"><br><br>
-        
-        <!-- Campos para la suma de variables -->
-        <div id="campos-suma" style="display: none;">
-            <label for="variable1">Variable 1:</label>
-            <input type="text" id="variable1" name="variable1"><br><br>
-            <label for="variable2">Variable 2:</label>
-            <input type="text" id="variable2" name="variable2"><br><br>
-        </div>
-        
-        <button type="submit">Agregar Nodo</button>
-    </form>
+    <!-- Menús de contexto para agregar nodos -->
+    <div id="contextMenu" class="context-menu">
+        <ul id="menuVariables">
+            <li id="addVariableNode">Agregar Variable</li>
+            <li id="variableInput" style="display: none;">
+                <input type="text" id="variableNameInput" placeholder="Nombre de la variable">
+                <input type="text" id="variableDataInput" placeholder="Dato de la variable">
+                <button id="confirmVariable">Confirmar</button>
+                <button id="cancelVariable">Cancelar</button>
+            </li>
+            <li id="addArrayNode">Agregar Array</li>
+            <li id="arrayInput" style="display: none;">
+                <input type="text" id="arrayNameInput" placeholder="Nombre del array">
+                <input type="text" id="arrayDataInput" placeholder="Datos del array (separados por coma)">
+                <button id="confirmArray">Confirmar</button>
+                <button id="cancelArray">Cancelar</button>
+            </li>
+            <li id="addFunctionNode">Agregar Función</li>
+            <li id="addConditionalNode">Agregar Condicional</li>
+        </ul>
+ 
+            <ul class="sub-menu" id="functionSubMenu">
+                <li id="addEchoFunction">Echo</li>
+                <li id="addEmptyFunction">Empty</li>
+            </ul>
 
-    <hr>
 
-    <!-- Formulario para funciones -->
-    <form id="functionForm">
-        <label for="nombre-funcion">Nombre de la función:</label>
-        <input type="text" id="nombre-funcion" name="nombre-funcion" required><br><br>
+            <ul class="sub-menu" id="conditionalSubMenu">
+                <li id="addIfConditional">If</li>
+                <li id="addWhileConditional">While</li>
+                <li id="addForConditional">For</li>
+            </ul>
+
+    </div>
+
+
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var $ = go.GraphObject.make;
+
+        var myDiagram = $(go.Diagram, "diagramDiv", {
+            initialContentAlignment: go.Spot.Center,
+            "undoManager.isEnabled": true,
+            "clickCreatingTool.archetypeNodeData": { key: "NuevoNodo", loc: "0 0", nombre: "Nuevo Nodo", tipo: "texto", valor: "" }
+        });
+
+        // Define a simple node template
+        myDiagram.nodeTemplate = $(go.Node, "Auto",
+            new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+            $(go.Shape, "RoundedRectangle", { fill: "white", portId: "", cursor: "pointer" }),
+            $(go.TextBlock, { margin: 8 },
+                new go.Binding("text", "key")),
+            // Panel de datos para mostrar información adicional
+            $(go.Panel, "Table", { defaultAlignment: go.Spot.Left },
+                $(go.RowColumnDefinition, { column: 8, width: 8 }),
+                $(go.TextBlock, "Tipo: ", { row: 2, column: 0 }),
+                $(go.TextBlock, { name: "tipo", row: 2, column: 1, margin: 3 },
+                    new go.Binding("text", "tipo")),
+                $(go.TextBlock, "Valor: ", { row: 3, column: 0 }),
+                $(go.TextBlock, { name: "valor", row: 3, column: 1, margin: 3 },
+                    new go.Binding("text", "valor"))
+            )
+        );
+
+        // Define a simple link template with an arrow
+        myDiagram.linkTemplate = $(go.Link,
+            { routing: go.Link.Orthogonal, corner: 5 },
+            $(go.Shape, { stroke: "black", strokeWidth: 1.5 }),
+            $(go.Shape, { toArrow: "Standard", stroke: null })
+        );
+
+        // Function to handle context menu display
+        function showContextMenu(e, obj) {
+            var contextMenu = document.getElementById("contextMenu");
+            contextMenu.style.left = (e.event.clientX - 10) + "px"; // Ajusta la posición izquierda del menú
+            contextMenu.style.top = (e.event.clientY - 10) + "px"; // Ajusta la posición superior del menú
+            contextMenu.style.display = "block";
+            contextMenu.dataset.node = obj.part.data.key; // Guarda el key del nodo seleccionado
+            e.diagram.currentTool.stopTool(); // Detiene cualquier tool en uso actualmente
+        }
+        // Event listener para confirmar la entrada de variable
+	document.getElementById("confirmVariable").addEventListener("click", function() {
+    var variableName = document.getElementById("variableNameInput").value;
+    var variableData = document.getElementById("variableDataInput").value;
+    
+    // Enviamos los datos al archivo PHP usando fetch
+	fetch('generate_and_save_php.php', {
+	    method: 'POST',
+	    headers: {
+	        'Content-Type': 'application/x-www-form-urlencoded',
+	    },
+	    body: 'variableName=' + encodeURIComponent(variableName) + '&variableData=' + encodeURIComponent(variableData)
+	})
+	.then(response => {
+	    if (!response.ok) {
+	        throw new Error('Network response was not ok');
+	    }
+	    console.log('Datos de variable enviados correctamente.');
+	})
+	.catch(error => {
+	    console.error('Error al enviar datos de variable:', error);
+	});
+
+	hideContextMenu();
+	resetInput("variableNameInput");
+	resetInput("variableDataInput");
+    });
+
+    // Event listener para confirmar la entrada de array
+    document.getElementById("confirmArray").addEventListener("click", function() {
+	var arrayName = document.getElementById("arrayNameInput").value;
+	var arrayData = document.getElementById("arrayDataInput").value;
+
+	// Enviamos los datos al archivo PHP usando fetch
+	fetch('generate_and_save_php.php', {
+	    method: 'POST',
+	    headers: {
+	        'Content-Type': 'application/x-www-form-urlencoded',
+	    },
+	    body: 'arrayName=' + encodeURIComponent(arrayName) + '&arrayData=' + encodeURIComponent(arrayData)
+	})
+	.then(response => {
+	    if (!response.ok) {
+	        throw new Error('Network response was not ok');
+	    }
+	    console.log('Datos de array enviados correctamente.');
+	})
+	.catch(error => {
+	    console.error('Error al enviar datos de array:', error);
+	});
+
+	hideContextMenu();
+	resetInput("arrayNameInput");
+	resetInput("arrayDataInput");
+    });
         
-        <label for="tipo-funcion">Tipo de función:</label>
-        <select id="tipo-funcion" name="tipo-funcion" required>
-            <option value="empty-f">Empty</option>
-            <option value="unset-f">Unset</option>
-            <option value="isset-f">Isset</option>
-            <option value="count-f">Count</option>
-            <option value="print_r-f">Print_r</option>
-            <option value="echo-f">Echo</option>
-        </select><br><br>
+document.getElementById("addVariableNode").addEventListener("click", function() {
+	var variableInput = document.getElementById("variableInput");
+	variableInput.style.display = "block";
+    });
 
-        <button type="submit">Agregar Función</button>
-    </form>
+    // Event listener para confirmar la entrada de variable
+  document.getElementById("confirmVariable").addEventListener("click", function() {
+	var variableName = document.getElementById("variableNameInput").value;
+	var variableData = document.getElementById("variableDataInput").value;
+	addNode("NuevoNodo", "Variable", "variable", "$" + variableName + " = " + variableData);
+	hideContextMenu();
+	resetInput("variableNameInput");
+	resetInput("variableDataInput");
+    });
 
-    <hr>
+    // Event listener para cancelar la entrada de variable
+  document.getElementById("cancelVariable").addEventListener("click", function() {
+	resetInput("variableNameInput");
+	resetInput("variableDataInput");
+	hideSubMenu("menuVariables");
+    });
 
-    <!-- Formulario para condicionales -->
-    <form id="conditionForm">
-        <label for="condicion-1">Condición 1:</label>
-        <input type="text" id="condicion-1" name="condicion-1" required><br><br>
+    // Event listener para mostrar el campo de entrada cuando se selecciona "Agregar Array"
+  document.getElementById("addArrayNode").addEventListener("click", function() {
+	var arrayInput = document.getElementById("arrayInput");
+	arrayInput.style.display = "block";
+    });
+
+    // Event listener para confirmar la entrada de array
+  document.getElementById("confirmArray").addEventListener("click", function() {
+	var arrayName = document.getElementById("arrayNameInput").value;
+	var arrayData = document.getElementById("arrayDataInput").value.split(",").map(item => item.trim()).join(", ");
+	addNode("NuevoNodo", "Array", "array", "$" + arrayName + " = [" + arrayData + "]");
+	hideContextMenu();
+	resetInput("arrayNameInput");
+	resetInput("arrayDataInput");
+    });
+
+    // Event listener para cancelar la entrada de array
+  document.getElementById("cancelArray").addEventListener("click", function() {
+	resetInput("arrayNameInput");
+	resetInput("arrayDataInput");
+	hideSubMenu("menuVariables");
+    });
+
+    document.getElementById("addFunctionNode").addEventListener("click", function() {
+    showSubMenu("functionSubMenu");
+});
+
+document.getElementById("addConditionalNode").addEventListener("click", function() {
+    showSubMenu("conditionalSubMenu");
+});
+
+
+    // Event listeners para funciones específicas
+    document.getElementById("addEchoFunction").addEventListener("click", function() {
+	addNode("NuevoNodo", "Función", "echo", "");
+	hideSubMenu("menuFunciones");
+    });
+
+    document.getElementById("addEmptyFunction").addEventListener("click", function() {
+	addNode("NuevoNodo", "Función", "empty", "");
+	hideSubMenu("menuFunciones");
+    });
+
+    // Event listeners para condicionales específicos
+    document.getElementById("addIfConditional").addEventListener("click", function() {
+	addNode("NuevoNodo", "Condición", "if", "");
+	hideSubMenu("menuCondicional");
+    });
+
+    document.getElementById("addWhileConditional").addEventListener("click", function() {
+	addNode("NuevoNodo", "Condición", "while", "");
+	hideSubMenu("menuCondicional");
+    });
+
+    document.getElementById("addForConditional").addEventListener("click", function() {
+	addNode("NuevoNodo", "Condición", "for", "");
+	hideSubMenu("menuCondicional");
+    });
+
+
+        // Function to add a new node
+        function addNode(fromNodeKey, nombre, tipo, valor) {
+            var newNodeKey = makeUniqueKey(); // Función para generar un key único
+            myDiagram.model.addNodeData({ key: newNodeKey, loc: "300 150", nombre: nombre, tipo: tipo, valor: valor });
+            myDiagram.model.addLinkData({ from: fromNodeKey, to: newNodeKey });
+        }
+
+        // Function to hide context menu
+        function hideContextMenu() {
+            var contextMenu = document.getElementById("contextMenu");
+            contextMenu.style.display = "none";
+        }
+
+        // Function to show submenu
+        function showSubMenu(menuId) {
+            hideAllMenus();
+            var menu = document.getElementById(menuId);
+            menu.style.display = "block";
+        }
+
+        // Function to hide all menus
+        function hideAllMenus() {
+            var menus = document.querySelectorAll(".context-menu ul");
+            menus.forEach(function(menu) {
+                menu.style.display = "none";
+            });
+        }
+
+        // Function to hide submenu
+        function hideSubMenu(menuId) {
+            var menu = document.getElementById(menuId);
+            menu.style.display = "none";
+        }
+
+        // Event listener for showing context menu on diagram click
+        myDiagram.contextClick = function(e, obj) {
+            if (!obj) showContextMenu(e, obj);
+        };
+
+        // Function to generate unique keys for nodes
+        function makeUniqueKey() {
+            return "" + (myDiagram.model.nodeDataArray.length + 1);
+        }
         
-        <label for="condicion-2">Condición 2:</label>
-        <input type="text" id="condicion-2" name="condicion-2" required><br><br>
-        
-        <label for="respuesta">Respuesta:</label>
-        <input type="text" id="respuesta" name="respuesta"><br><br>
-        
-        <label for="tipo-condicional">Tipo de condicional:</label>
-        <select id="tipo-condicional" name="tipo-condicional" required>
-            <option value="if-f">If</option>
-            <option value="for-f">For</option>
-            <option value="while-f">While</option>
-        </select><br><br>
+        function resetInput(inputId) {
+        document.getElementById(inputId).value = "";
+	    }
+	    
 
-        <button type="submit">Agregar Condicional</button>
-    </form>
-
-    <script src="script.js"></script>
+});
+    </script>
 </body>
 </html>
 

@@ -1,318 +1,393 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagrama de Flujo con GoJS</title>
-    <script src="https://unpkg.com/gojs/release/go.js"></script>
-    <style>
-        #diagramDiv {
-            width: 100%;
-            height: 600px;
-            border: 1px solid black;
-        }
-        .context-menu {
-            position: absolute;
-            background-color: white;
-            border: 1px solid #ccc;
-            padding: 5px;
-            z-index: 1000;
-            display: none;
-        }
-        .context-menu ul {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
-        .context-menu ul li {
-            cursor: pointer;
-            margin-bottom: 5px;
-        }
-        .sub-menu {
-            display: none;
-            margin-left: 10px;
-            padding-left: 10px;
-            border-left: 1px solid #ccc;
-        }
-        .sub-menu li {
-            cursor: pointer;
-            margin-bottom: 5px;
-        }
-    </style>
-</head>
-<body>
-    <div id="diagramDiv"></div>
 
-    <!-- Menús de contexto para agregar nodos -->
-    <div id="contextMenu" class="context-menu">
-        <ul id="menuVariables">
-            <li id="addVariableNode">Agregar Variable</li>
-            <li id="variableInput" style="display: none;">
-                <input type="text" id="variableNameInput" placeholder="Nombre de la variable">
-                <input type="text" id="variableDataInput" placeholder="Dato de la variable">
-                <button id="confirmVariable">Confirmar</button>
-                <button id="cancelVariable">Cancelar</button>
-            </li>
-            <li id="addArrayNode">Agregar Array</li>
-            <li id="arrayInput" style="display: none;">
-                <input type="text" id="arrayNameInput" placeholder="Nombre del array">
-                <input type="text" id="arrayDataInput" placeholder="Datos del array (separados por coma)">
-                <button id="confirmArray">Confirmar</button>
-                <button id="cancelArray">Cancelar</button>
-            </li>
-            <li id="addFunctionNode">Agregar Función</li>
-            <li id="addConditionalNode">Agregar Condicional</li>
-        </ul>
- 
-            <ul class="sub-menu" id="functionSubMenu">
-                <li id="addEchoFunction">Echo</li>
-                <li id="addEmptyFunction">Empty</li>
-            </ul>
-
-
-            <ul class="sub-menu" id="conditionalSubMenu">
-                <li id="addIfConditional">If</li>
-                <li id="addWhileConditional">While</li>
-                <li id="addForConditional">For</li>
-            </ul>
-
-    </div>
+  <!DOCTYPE html>
+  <html lang="en">
+  <body>
+  <script src="https://unpkg.com/gojs@3.0.5/release/go.js"></script>
+  <div id="allSampleContent" class="p-4 w-full">
 
 
 
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        var $ = go.GraphObject.make;
+<link href="https://fonts.googleapis.com/css?family=Figtree:400,600&amp;subset=latin,latin-ext" rel="stylesheet" type="text/css">
+<style>
+  #hidden {
+    font: 600 18px Figtree;
+    opacity: 0;
+  }
+</style>
 
-        var myDiagram = $(go.Diagram, "diagramDiv", {
-            initialContentAlignment: go.Spot.Center,
-            "undoManager.isEnabled": true,
-            "clickCreatingTool.archetypeNodeData": { key: "NuevoNodo", loc: "0 0", nombre: "Nuevo Nodo", tipo: "texto", valor: "" }
+<script id="code">
+  function init() {
+    if (window.goSamples) goSamples(); // init for these samples -- you don't need to call this
+
+    myDiagram = new go.Diagram(
+      'myDiagramDiv', // must name or refer to the DIV HTML element
+      {
+        'undoManager.isEnabled': true, // enable undo & redo
+        'themeManager.changesDivBackground': true,
+        'themeManager.currentTheme': document.getElementById('theme').value,
+      }
+    );
+
+    // when the document is modified, add a "*" to the title and enable the "Save" button
+    myDiagram.addDiagramListener('Modified', (e) => {
+      const button = document.getElementById('SaveButton');
+      if (button) button.disabled = !myDiagram.isModified;
+      const idx = document.title.indexOf('*');
+      if (myDiagram.isModified) {
+        if (idx < 0) document.title += '*';
+      } else {
+        if (idx >= 0) document.title = document.title.slice(0, idx);
+      }
+    });
+
+    // set up some colors/fonts for the default ('light') and dark Themes
+    myDiagram.themeManager.set('light', {
+      colors: {
+        text: '#fff',
+        start: '#064e3b',
+        step: '#49939e',
+        conditional: '#6a9a8a',
+        end: '#7f1d1d',
+        comment: '#a691cc',
+        bgText: '#000',
+        link: '#dcb263',
+        linkOver: '#cbd5e1',
+        div: '#ede9e0',
+      },
+    });
+
+    myDiagram.themeManager.set('dark', {
+      colors: {
+        text: '#fff',
+        step: '#414a8d',
+        conditional: '#88afa2',
+        comment: '#bfb674',
+        bgText: '#fff',
+        link: '#fdb71c',
+        linkOver: '#475569',
+        div: '#141e37',
+      },
+    });
+
+    defineFigures();
+
+    // helper definitions for node templates
+    function nodeStyle(node) {
+      node
+        // the Node.location is at the center of each node
+        .set({ locationSpot: go.Spot.Center })
+        // The Node.location comes from the "loc" property of the node data,
+        // converted by the Point.parse static method.
+        // If the Node.location is changed, it updates the "loc" property of the node data,
+        // converting back using the Point.stringify static method.
+        .bindTwoWay('location', 'loc', go.Point.parse, go.Point.stringify);
+    }
+
+    function shapeStyle(shape) {
+      // make the whole node shape a port
+      shape.set({ strokeWidth: 0, portId: '', cursor: 'pointer' });
+    }
+
+    function textStyle(textblock) {
+      textblock.set({ font: 'bold 11pt Figtree, sans-serif' }).theme('stroke', 'text');
+    }
+
+    // define the Node templates for regular nodes
+    myDiagram.nodeTemplateMap.add(
+      '', // the default category
+      new go.Node('Auto').apply(nodeStyle).add(
+        new go.Shape('Rectangle', {
+          fromLinkable: true,
+          toLinkable: true,
+          fromSpot: go.Spot.AllSides,
+          toSpot: go.Spot.AllSides,
+        })
+          .apply(shapeStyle)
+          .theme('fill', 'step'),
+        new go.TextBlock({
+          margin: 12,
+          maxSize: new go.Size(160, NaN),
+          wrap: go.Wrap.Fit,
+          editable: true,
+        })
+          .apply(textStyle)
+          .bindTwoWay('text')
+      )
+    );
+
+    myDiagram.nodeTemplateMap.add(
+      'Conditional',
+      new go.Node('Auto').apply(nodeStyle).add(
+        new go.Shape('Conditional', { fromLinkable: true, toLinkable: true }).apply(shapeStyle).theme('fill', 'conditional'),
+        new go.TextBlock({
+          margin: 8,
+          maxSize: new go.Size(160, NaN),
+          wrap: go.Wrap.Fit,
+          textAlign: 'center',
+          editable: true,
+        })
+          .apply(textStyle)
+          .bindTwoWay('text')
+      )
+    );
+
+    myDiagram.nodeTemplateMap.add(
+      'Start',
+      new go.Node('Auto')
+        .apply(nodeStyle)
+        .add(
+          new go.Shape('Capsule', { fromLinkable: true }).apply(shapeStyle).theme('fill', 'start'),
+          new go.TextBlock('Start', { margin: new go.Margin(5, 6) }).apply(textStyle).bind('text')
+        )
+    );
+
+    myDiagram.nodeTemplateMap.add(
+      'End',
+      new go.Node('Auto')
+        .apply(nodeStyle)
+        .add(
+          new go.Shape('Capsule', { toLinkable: true }).apply(shapeStyle).theme('fill', 'end'),
+          new go.TextBlock('End', { margin: new go.Margin(5, 6) }).apply(textStyle).bind('text')
+        )
+    );
+
+    myDiagram.nodeTemplateMap.add(
+      'Comment',
+      new go.Node('Auto').apply(nodeStyle).add(
+        new go.Shape('File', { strokeWidth: 3 }).theme('fill', 'div').theme('stroke', 'comment'),
+        new go.TextBlock({
+          font: '9pt Figtree, sans-serif',
+          margin: 8,
+          maxSize: new go.Size(200, NaN),
+          wrap: go.Wrap.Fit,
+          textAlign: 'center',
+          editable: true,
+        })
+          .theme('stroke', 'bgText')
+          .bindTwoWay('text')
+        // no ports, because no links are allowed to connect with a comment
+      )
+    );
+
+    // replace the default Link template in the linkTemplateMap
+    myDiagram.linkTemplate = new go.Link({
+      routing: go.Routing.AvoidsNodes,
+      curve: go.Curve.JumpOver,
+      corner: 5,
+      toShortLength: 4,
+      relinkableFrom: true,
+      relinkableTo: true,
+      reshapable: true,
+      resegmentable: true,
+      // mouse-overs subtly highlight links:
+      mouseEnter: (e, link) => (link.findObject('HIGHLIGHT').stroke = link.diagram.themeManager.findValue('linkOver', 'colors')),
+      mouseLeave: (e, link) => (link.findObject('HIGHLIGHT').stroke = 'transparent'),
+      // context-click creates an editable link label
+      contextClick: (e, link) => {
+        e.diagram.model.commit((m) => {
+          m.set(link.data, 'text', 'Label');
         });
+      },
+    })
+      .bindTwoWay('points')
+      .add(
+        // the highlight shape, normally transparent
+        new go.Shape({
+          isPanelMain: true,
+          strokeWidth: 8,
+          stroke: 'transparent',
+          name: 'HIGHLIGHT',
+        }),
+        // the link path shape
+        new go.Shape({ isPanelMain: true, strokeWidth: 2 }).theme('stroke', 'link'),
+        // the arrowhead
+        new go.Shape({ toArrow: 'standard', strokeWidth: 0, scale: 1.5 }).theme('fill', 'link'),
+        // the link label
+        new go.Panel('Auto', { visible: false })
+          .bind('visible', 'text', (t) => typeof t === 'string' && t.length > 0) // only shown if there is text
+          .add(
+            // a gradient that fades into the background
+            new go.Shape('Ellipse', { strokeWidth: 0 }).theme('fill', 'div', null, null, (c) => {
+              return new go.Brush(go.BrushType.Radial, {
+                colorStops: new go.Map([
+                  { key: 0, value: c },
+                  { key: 0.5, value: `${c}00` },
+                ]),
+              });
+            }),
+            new go.TextBlock({
+              name: 'LABEL',
+              font: '9pt Figtree, sans-serif',
+              margin: 3,
+              editable: true,
+            })
+              .theme('stroke', 'bgText')
+              .bindTwoWay('text')
+          )
+      );
 
-        // Define a simple node template
-        myDiagram.nodeTemplate = $(go.Node, "Auto",
-            new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-            $(go.Shape, "RoundedRectangle", { fill: "white", portId: "", cursor: "pointer" }),
-            $(go.TextBlock, { margin: 8 },
-                new go.Binding("text", "key")),
-            // Panel de datos para mostrar información adicional
-            $(go.Panel, "Table", { defaultAlignment: go.Spot.Left },
-                $(go.RowColumnDefinition, { column: 8, width: 8 }),
-                $(go.TextBlock, "Tipo: ", { row: 2, column: 0 }),
-                $(go.TextBlock, { name: "tipo", row: 2, column: 1, margin: 3 },
-                    new go.Binding("text", "tipo")),
-                $(go.TextBlock, "Valor: ", { row: 3, column: 0 }),
-                $(go.TextBlock, { name: "valor", row: 3, column: 1, margin: 3 },
-                    new go.Binding("text", "valor"))
-            )
-        );
+    // temporary links used by LinkingTool and RelinkingTool are also orthogonal:
+    myDiagram.toolManager.linkingTool.temporaryLink.routing = go.Routing.Orthogonal;
+    myDiagram.toolManager.relinkingTool.temporaryLink.routing = go.Routing.Orthogonal;
 
-        // Define a simple link template with an arrow
-        myDiagram.linkTemplate = $(go.Link,
-            { routing: go.Link.Orthogonal, corner: 5 },
-            $(go.Shape, { stroke: "black", strokeWidth: 1.5 }),
-            $(go.Shape, { toArrow: "Standard", stroke: null })
-        );
+    load(); // load an initial diagram from some JSON text
 
-        // Function to handle context menu display
-        function showContextMenu(e, obj) {
-            var contextMenu = document.getElementById("contextMenu");
-            contextMenu.style.left = (e.event.clientX - 10) + "px"; // Ajusta la posición izquierda del menú
-            contextMenu.style.top = (e.event.clientY - 10) + "px"; // Ajusta la posición superior del menú
-            contextMenu.style.display = "block";
-            contextMenu.dataset.node = obj.part.data.key; // Guarda el key del nodo seleccionado
-            e.diagram.currentTool.stopTool(); // Detiene cualquier tool en uso actualmente
-        }
-        // Event listener para confirmar la entrada de variable
-	document.getElementById("confirmVariable").addEventListener("click", function() {
-    var variableName = document.getElementById("variableNameInput").value;
-    var variableData = document.getElementById("variableDataInput").value;
-    
-    // Enviamos los datos al archivo PHP usando fetch
-	fetch('generate_and_save_php.php', {
-	    method: 'POST',
-	    headers: {
-	        'Content-Type': 'application/x-www-form-urlencoded',
-	    },
-	    body: 'variableName=' + encodeURIComponent(variableName) + '&variableData=' + encodeURIComponent(variableData)
-	})
-	.then(response => {
-	    if (!response.ok) {
-	        throw new Error('Network response was not ok');
-	    }
-	    console.log('Datos de variable enviados correctamente.');
-	})
-	.catch(error => {
-	    console.error('Error al enviar datos de variable:', error);
-	});
+    // initialize the Palette that is on the left side of the page
+    myPalette = new go.Palette(
+      'myPaletteDiv', // must name or refer to the DIV HTML element
+      {
+        nodeTemplateMap: myDiagram.nodeTemplateMap, // share the templates used by myDiagram
+        themeManager: myDiagram.themeManager, // share the ThemeManager used by myDiagram
+        model: new go.GraphLinksModel([
+          // specify the contents of the Palette
+          { category: 'Start', text: 'Inicio' },
+          { text: 'Texto' },
+          { category: 'Conditional', text: '???' },
+          { category: 'End', text: 'Fin' },
+          { category: 'Comment', text: 'Exegesis' },
+        ]),
+      }
+    );
+  } // end init
 
-	hideContextMenu();
-	resetInput("variableNameInput");
-	resetInput("variableDataInput");
+  // define some custom shapes for node templates
+  function defineFigures() {
+    go.Shape.defineFigureGenerator('Conditional', (shape, w, h) => {
+      const geo = new go.Geometry();
+      const fig = new go.PathFigure(w * 0.15, 0, true);
+      geo.add(fig);
+      fig.add(new go.PathSegment(go.SegmentType.Line, w * 0.85, 0));
+      fig.add(new go.PathSegment(go.SegmentType.Line, w, 0.5 * h));
+      fig.add(new go.PathSegment(go.SegmentType.Line, w * 0.85, h));
+      fig.add(new go.PathSegment(go.SegmentType.Line, w * 0.15, h));
+      fig.add(new go.PathSegment(go.SegmentType.Line, 0, 0.5 * h).close());
+      geo.spot1 = new go.Spot(0.15, 0);
+      geo.spot2 = new go.Spot(0.85, 1);
+      return geo;
     });
 
-    // Event listener para confirmar la entrada de array
-    document.getElementById("confirmArray").addEventListener("click", function() {
-	var arrayName = document.getElementById("arrayNameInput").value;
-	var arrayData = document.getElementById("arrayDataInput").value;
-
-	// Enviamos los datos al archivo PHP usando fetch
-	fetch('generate_and_save_php.php', {
-	    method: 'POST',
-	    headers: {
-	        'Content-Type': 'application/x-www-form-urlencoded',
-	    },
-	    body: 'arrayName=' + encodeURIComponent(arrayName) + '&arrayData=' + encodeURIComponent(arrayData)
-	})
-	.then(response => {
-	    if (!response.ok) {
-	        throw new Error('Network response was not ok');
-	    }
-	    console.log('Datos de array enviados correctamente.');
-	})
-	.catch(error => {
-	    console.error('Error al enviar datos de array:', error);
-	});
-
-	hideContextMenu();
-	resetInput("arrayNameInput");
-	resetInput("arrayDataInput");
+    // taken from https://unpkg.com/create-gojs-kit@3.0.5/dist/extensions/Figures.js:
+    go.Shape.defineFigureGenerator('File', (shape, w, h) => {
+      const geo = new go.Geometry();
+      const fig = new go.PathFigure(0, 0, true); // starting point
+      geo.add(fig);
+      fig.add(new go.PathSegment(go.SegmentType.Line, 0.75 * w, 0));
+      fig.add(new go.PathSegment(go.SegmentType.Line, w, 0.25 * h));
+      fig.add(new go.PathSegment(go.SegmentType.Line, w, h));
+      fig.add(new go.PathSegment(go.SegmentType.Line, 0, h).close());
+      const fig2 = new go.PathFigure(0.75 * w, 0, false);
+      geo.add(fig2);
+      // The Fold
+      fig2.add(new go.PathSegment(go.SegmentType.Line, 0.75 * w, 0.25 * h));
+      fig2.add(new go.PathSegment(go.SegmentType.Line, w, 0.25 * h));
+      geo.spot1 = new go.Spot(0, 0.25);
+      geo.spot2 = go.Spot.BottomRight;
+      return geo;
     });
-        
-document.getElementById("addVariableNode").addEventListener("click", function() {
-	var variableInput = document.getElementById("variableInput");
-	variableInput.style.display = "block";
-    });
+  }
 
-    // Event listener para confirmar la entrada de variable
-  document.getElementById("confirmVariable").addEventListener("click", function() {
-	var variableName = document.getElementById("variableNameInput").value;
-	var variableData = document.getElementById("variableDataInput").value;
-	addNode("NuevoNodo", "Variable", "variable", "$" + variableName + " = " + variableData);
-	hideContextMenu();
-	resetInput("variableNameInput");
-	resetInput("variableDataInput");
-    });
+  // Show the diagram's model in JSON format that the user may edit
+  function save() {
+    document.getElementById('mySavedModel').value = myDiagram.model.toJson();
+    myDiagram.isModified = false;
+  }
+  function load() {
+    myDiagram.model = go.Model.fromJson(document.getElementById('mySavedModel').value);
+  }
 
-    // Event listener para cancelar la entrada de variable
-  document.getElementById("cancelVariable").addEventListener("click", function() {
-	resetInput("variableNameInput");
-	resetInput("variableDataInput");
-	hideSubMenu("menuVariables");
-    });
+  // print the diagram by opening a new window holding SVG images of the diagram contents for each page
+  function printDiagram() {
+    const svgWindow = window.open();
+    if (!svgWindow) return; // failure to open a new Window
+    svgWindow.document.title = "GoJS Flowchart";
+    svgWindow.document.body.style.margin = "0px";
+    const printSize = new go.Size(700, 960);
+    const bnds = myDiagram.documentBounds;
+    let x = bnds.x;
+    let y = bnds.y;
+    while (y < bnds.bottom) {
+      while (x < bnds.right) {
+        const svg = myDiagram.makeSvg({
+          scale: 1.0,
+          position: new go.Point(x, y),
+          size: printSize,
+          background: myDiagram.themeManager.findValue('div', 'colors'),
+        });
+        svgWindow.document.body.appendChild(svg);
+        x += printSize.width;
+      }
+      x = bnds.x;
+      y += printSize.height;
+    }
+    setTimeout(() => { svgWindow.print(); svgWindow.close(); }, 1);
+  }
 
-    // Event listener para mostrar el campo de entrada cuando se selecciona "Agregar Array"
-  document.getElementById("addArrayNode").addEventListener("click", function() {
-	var arrayInput = document.getElementById("arrayInput");
-	arrayInput.style.display = "block";
-    });
+  function changeTheme() {
+    const myDiagram = go.Diagram.fromDiv('myDiagramDiv');
+    if (myDiagram) {
+      myDiagram.themeManager.currentTheme = document.getElementById('theme').value;
+    }
+  }
 
-    // Event listener para confirmar la entrada de array
-  document.getElementById("confirmArray").addEventListener("click", function() {
-	var arrayName = document.getElementById("arrayNameInput").value;
-	var arrayData = document.getElementById("arrayDataInput").value.split(",").map(item => item.trim()).join(", ");
-	addNode("NuevoNodo", "Array", "array", "$" + arrayName + " = [" + arrayData + "]");
-	hideContextMenu();
-	resetInput("arrayNameInput");
-	resetInput("arrayDataInput");
-    });
+  window.addEventListener('DOMContentLoaded', () => {
+    // setTimeout only to ensure font is loaded before loading diagram
+    // you may want to use an asset loading library for this
+    // to keep this sample simple, it does not
+    setTimeout(() => {
+      init();
+    }, 300);
+  });
+</script>
 
-    // Event listener para cancelar la entrada de array
-  document.getElementById("cancelArray").addEventListener("click", function() {
-	resetInput("arrayNameInput");
-	resetInput("arrayDataInput");
-	hideSubMenu("menuVariables");
-    });
+<div id="sample">
+  <div class="sampleWrapper">
+    <div style="width: 100%; height: fit-content; display: flex; flex: 2">
+      <div id="myPaletteDiv" style="width: 100px; margin-right: 2px; position: relative; -webkit-tap-highlight-color: rgba(255, 255, 255, 0); background-color: rgb(20, 30, 55); cursor: auto;"><canvas tabindex="0" width="100" height="810" style="position: absolute; top: 0px; left: 0px; z-index: 2; user-select: none; touch-action: none; width: 100px; height: 810px; cursor: auto;"></canvas><div style="position: absolute; overflow: auto; width: 100px; height: 810px; z-index: 1;"><div style="position: absolute; width: 1px; height: 1px;"></div></div></div>
+      <div id="myDiagramDiv" style="flex-grow: 1; height: 810px; position: relative; -webkit-tap-highlight-color: rgba(255, 255, 255, 0); background-color: rgb(20, 30, 55); cursor: auto; font: bold 11pt Figtree, sans-serif;"><canvas tabindex="0" width="713" height="810" style="position: absolute; top: 0px; left: 0px; z-index: 2; user-select: none; touch-action: none; width: 713px; height: 810px; cursor: auto;"></canvas><div style="position: absolute; overflow: auto; width: 713px; height: 810px; z-index: 1;"><div style="position: absolute; width: 1px; height: 1px;"></div></div></div>
+    </div>
+    <div style="flex: 1; min-width: 425px">
+      Theme:
+      <select id="theme" onchange="changeTheme()">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark" selected="">Dark</option>
+      </select>
+      
+      <button onclick="printDiagram()">Print Diagram Using SVG</button>
+      <br>
+      <button id="SaveButton" onclick="save()">Save</button>
+      <button onclick="load()">Load</button>
+      Diagram Model saved in JSON format:
+      <textarea id="mySavedModel" style="width: 100%; height: 375px">{ "class": "GraphLinksModel",
+  "nodeDataArray": [
+  ],
+  "linkDataArray": [
 
-    document.getElementById("addFunctionNode").addEventListener("click", function() {
-    showSubMenu("functionSubMenu");
-});
+  ]}
+      </textarea>
+      <p id="hidden" style="padding: 0; height: 0px">this forces the font to load in Chromium browsers</p>
+    </div>
+  </div>
 
-document.getElementById("addConditionalNode").addEventListener("click", function() {
-    showSubMenu("conditionalSubMenu");
-});
+<style>
+  .sampleWrapper {
+    display: flex;
+    flex-direction: column;
 
+    @media (min-width: 1280px) {
+      flex-direction: row;
+    }
 
-    // Event listeners para funciones específicas
-    document.getElementById("addEchoFunction").addEventListener("click", function() {
-	addNode("NuevoNodo", "Función", "echo", "");
-	hideSubMenu("menuFunciones");
-    });
+    & > div:first-child {
+      margin-bottom: 0.5rem;
 
-    document.getElementById("addEmptyFunction").addEventListener("click", function() {
-	addNode("NuevoNodo", "Función", "empty", "");
-	hideSubMenu("menuFunciones");
-    });
+      @media (min-width: 1280px) {
+        margin-right: 0.5rem;
+        margin-bottom: 0;
+      }
+    }
+  }
+</style>
 
-    // Event listeners para condicionales específicos
-    document.getElementById("addIfConditional").addEventListener("click", function() {
-	addNode("NuevoNodo", "Condición", "if", "");
-	hideSubMenu("menuCondicional");
-    });
-
-    document.getElementById("addWhileConditional").addEventListener("click", function() {
-	addNode("NuevoNodo", "Condición", "while", "");
-	hideSubMenu("menuCondicional");
-    });
-
-    document.getElementById("addForConditional").addEventListener("click", function() {
-	addNode("NuevoNodo", "Condición", "for", "");
-	hideSubMenu("menuCondicional");
-    });
-
-
-        // Function to add a new node
-        function addNode(fromNodeKey, nombre, tipo, valor) {
-            var newNodeKey = makeUniqueKey(); // Función para generar un key único
-            myDiagram.model.addNodeData({ key: newNodeKey, loc: "300 150", nombre: nombre, tipo: tipo, valor: valor });
-            myDiagram.model.addLinkData({ from: fromNodeKey, to: newNodeKey });
-        }
-
-        // Function to hide context menu
-        function hideContextMenu() {
-            var contextMenu = document.getElementById("contextMenu");
-            contextMenu.style.display = "none";
-        }
-
-        // Function to show submenu
-        function showSubMenu(menuId) {
-            hideAllMenus();
-            var menu = document.getElementById(menuId);
-            menu.style.display = "block";
-        }
-
-        // Function to hide all menus
-        function hideAllMenus() {
-            var menus = document.querySelectorAll(".context-menu ul");
-            menus.forEach(function(menu) {
-                menu.style.display = "none";
-            });
-        }
-
-        // Function to hide submenu
-        function hideSubMenu(menuId) {
-            var menu = document.getElementById(menuId);
-            menu.style.display = "none";
-        }
-
-        // Event listener for showing context menu on diagram click
-        myDiagram.contextClick = function(e, obj) {
-            if (!obj) showContextMenu(e, obj);
-        };
-
-        // Function to generate unique keys for nodes
-        function makeUniqueKey() {
-            return "" + (myDiagram.model.nodeDataArray.length + 1);
-        }
-        
-        function resetInput(inputId) {
-        document.getElementById(inputId).value = "";
-	    }
-	    
-
-});
-    </script>
-</body>
-</html>
-
+  </body>
+  </html>

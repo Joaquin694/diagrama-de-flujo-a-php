@@ -1,15 +1,33 @@
 <?php
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $json = $_POST['json'];
+    // Obtener el JSON enviado desde el cliente
+    $json = isset($_POST['json']) ? $_POST['json'] : '';
+    
+    if (!$json) {
+        die('No se recibió JSON válido.');
+    }
 
     // Decodifica el JSON a un array PHP
     $data = json_decode($json, true);
 
-    // Abre el archivo tucodigo.php para escritura
-    $file = fopen('tucodigo.php', 'w');
+    if (!$data) {
+        die('Error al decodificar JSON.');
+    }
 
-    // Escribe la cabecera del archivo PHP
-    fwrite($file, "<?php\n");
+    // Ruta del archivo tucodigo.php
+    $filePath = 'tucodigo.php';
+
+    // Abre el archivo tucodigo.php para escritura
+    $file = fopen($filePath, 'w');
+    
+    if (!$file) {
+        die('Error al abrir el archivo tucodigo.php para escritura.');
+    }
+
+    // Intenta escribir la cabecera del archivo PHP
+    if (fwrite($file, "<?php\n") === false) {
+        die('Error al escribir la cabecera del archivo PHP.');
+    }
 
     // Crea un array para almacenar los textos de los nodos
     $textByKey = [];
@@ -32,7 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Genera el código PHP solo si tenemos un texto de destino
             if ($toText) {
-                fwrite($file, "echo \"{$toText}\";\n");
+                if (fwrite($file, "echo \"{$toText}\";\n") === false) {
+                    die('Error al escribir el código de salida (echo).');
+                }
             }
         }
 
@@ -57,19 +77,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($variableText && $valueText) {
                 // Reemplaza las expresiones matemáticas simples en el valor
                 $valueText = preg_replace('/(\w+)/', '$$1', $valueText);
-                fwrite($file, "{$valueText} = {$variableText};\n");
+                if (fwrite($file, "{$valueText} = {$variableText};\n") === false) {
+                    die('Error al escribir el código de asignación.');
+                }
             }
         }
     }
 
-    // Escribe el pie del archivo PHP
-    fwrite($file, "?>\n");
+    // Intenta escribir el pie del archivo PHP
+    if (fwrite($file, "?>\n") === false) {
+        die('Error al escribir el pie del archivo PHP.');
+    }
 
     // Cierra el archivo
     fclose($file);
 
-    // Envía una respuesta al cliente
-    echo "Código PHP generado con éxito en tucodigo.php";
+    // Ahora descargamos el archivo tucodigo.php
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="tucodigo.php"');
+    readfile($filePath);
+    exit;
 }
 ?>
 

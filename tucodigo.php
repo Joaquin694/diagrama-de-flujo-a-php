@@ -1,4 +1,5 @@
 <?php
 echo "Texto";
-$Texto = Texto;
+echo "Hello";
+$A = "Variable";
 ?>

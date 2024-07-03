@@ -242,7 +242,12 @@
           // specify the contents of the Palette
           { category: 'Start', text: 'Inicio' },
           { text: 'Texto' },
-          { category: 'Conditional', text: '???' },
+          { category: 'Conditional', text: 'Escribir' },
+          { category: 'Conditional', text: 'Leer' },
+          { category: 'Conditional', text: 'Asignar' },
+          { category: 'Conditional', text: 'Si' },
+          { category: 'Conditional', text: 'Segun' },
+          { category: 'Conditional', text: 'Mientras' },
           { category: 'End', text: 'Fin' },
           { category: 'Comment', text: 'Exegesis' },
         ]),
@@ -321,6 +326,25 @@
     }
     setTimeout(() => { svgWindow.print(); svgWindow.close(); }, 1);
   }
+  
+function convertToPHP() {
+    const jsonData = myDiagram.model.toJson();
+    fetch('analisis.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ json: jsonData })
+    })
+      .then(response => response.text())
+      .then(text => {
+        // Crear un enlace para descargar el archivo PHP generado
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+        link.download = 'tucodigo.php';
+        link.click();
+      })
+      .catch(error => console.error('Error al convertir a PHP:', error));
+  }
+
 
   function changeTheme() {
     const myDiagram = go.Diagram.fromDiv('myDiagramDiv');
@@ -353,6 +377,7 @@
         <option value="dark" selected="">Dark</option>
       </select>
       
+      <button onclick="convertToPHP()">Convertir PHP</button>
       <button onclick="printDiagram()">Print Diagram Using SVG</button>
       <br>
       <button id="SaveButton" onclick="save()">Save</button>

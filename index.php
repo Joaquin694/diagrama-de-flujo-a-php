@@ -243,7 +243,6 @@
           { category: 'Start', text: 'Inicio' },
           { text: 'Texto' },
           { category: 'Conditional', text: 'Escribir' },
-          { category: 'Conditional', text: 'Leer' },
           { category: 'Conditional', text: 'Asignar' },
           { category: 'Conditional', text: 'Si' },
           { category: 'Conditional', text: 'Segun' },
